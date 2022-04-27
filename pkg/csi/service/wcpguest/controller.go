@@ -86,7 +86,7 @@ func New() csitypes.CnsController {
 // Init is initializing controller struct
 func (c *controller) Init(config *cnsconfig.Config, version string) error {
 	ctx, log := logger.GetNewContextWithLogger()
-	log.Infof("Initializing WCPGC CSI controller")
+	log.Infof("aditya->Initializing WCPGC CSI controller")
 	var err error
 	// connect to the CSI controller in supervisor cluster
 	c.supervisorNamespace, err = cnsconfig.GetSupervisorNamespace(ctx)
@@ -234,7 +234,7 @@ func (c *controller) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequ
 		*csi.CreateVolumeResponse, string, error) {
 
 		log.Infof("CreateVolume: called with args %+v", *req)
-		//TODO: If the err is returned by invoking CNS API, then faultType should be
+		// TODO: If the err is returned by invoking CNS API, then faultType should be
 		// populated by the underlying layer.
 		// If the request failed due to validate the request, "csi.fault.InvalidArgument" will be return.
 		// If thr reqeust failed due to object not found, "csi.fault.NotFound" will be return.
@@ -398,7 +398,7 @@ func (c *controller) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequ
 	deleteVolumeInternal := func() (
 		*csi.DeleteVolumeResponse, string, error) {
 		log.Infof("DeleteVolume: called with args: %+v", *req)
-		//TODO: If the err is returned by invoking CNS API, then faultType should be
+		// TODO: If the err is returned by invoking CNS API, then faultType should be
 		// populated by the underlying layer.
 		// If the request failed due to validate the request, "csi.fault.InvalidArgument" will be return.
 		// If thr reqeust failed due to object not found, "csi.fault.NotFound" will be return.
@@ -469,7 +469,7 @@ func (c *controller) ControllerPublishVolume(ctx context.Context, req *csi.Contr
 	controllerPublishVolumeInternal := func() (
 		*csi.ControllerPublishVolumeResponse, string, error) {
 		log.Infof("ControllerPublishVolume: called with args %+v", *req)
-		//TODO: If the err is returned by invoking CNS API, then faultType should be
+		// TODO: If the err is returned by invoking CNS API, then faultType should be
 		// populated by the underlying layer.
 		// If the request failed due to validate the request, "csi.fault.InvalidArgument" will be return.
 		// If thr reqeust failed due to object not found, "csi.fault.NotFound" will be return.
@@ -526,16 +526,17 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 
 	var err error
 	if err = c.vmOperatorClient.Get(ctx, vmKey, virtualMachine); err != nil {
-		msg := fmt.Sprintf("failed to get VirtualMachines for the node: %q. Error: %+v", req.NodeId, err)
+		msg := fmt.Sprintf("adkulkarni->failed to get VirtualMachines for the node: %q. Error: %+v", req.NodeId, err)
 		log.Error(msg)
 		return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 	}
+	log.Infof("adkulkarni->VirtualMachine %+v fetched for node: %q.", virtualMachine, req.NodeId)
 	// Check if volume is already present in the virtualMachine.Spec.Volumes
 	var isVolumePresentInSpec, isVolumeAttached bool
 	var diskUUID string
 	for _, volume := range virtualMachine.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil && volume.Name == req.VolumeId {
-			log.Infof("Volume %q is already present in the virtualMachine.Spec.Volumes", volume.Name)
+			log.Infof("adkulkarni->Volume %q is already present in the virtualMachine.Spec.Volumes", volume.Name)
 			isVolumePresentInSpec = true
 			break
 		}
@@ -547,14 +548,16 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 			if volume.Name == req.VolumeId && volume.Attached && volume.DiskUuid != "" {
 				diskUUID = volume.DiskUuid
 				isVolumeAttached = true
-				log.Infof("Volume %q is already attached in the virtualMachine.Spec.Volumes. Disk UUID: %q",
+				log.Infof("adkulkarni->Volume %q is already attached in the virtualMachine.Spec.Volumes. Disk UUID: %q",
 					volume.Name, volume.DiskUuid)
 				break
 			}
 		}
 	} else {
+		log.Infof("adkulkarni->VirtualMachine %+v fetched for node: %q.", virtualMachine, req.NodeId)
 		timeout := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
 		for {
+			log.Info("adkulkarni->looping...")
 			// Volume is not present in the virtualMachine.Spec.Volumes, so adding
 			// volume in the spec and patching virtualMachine instance.
 			vmvolumes := vmoperatortypes.VirtualMachineVolume{
@@ -567,20 +570,27 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 			}
 			virtualMachineLock.Lock()
 			virtualMachine.Spec.Volumes = append(virtualMachine.Spec.Volumes, vmvolumes)
-			err := c.vmOperatorClient.Update(ctx, virtualMachine)
+			err = c.vmOperatorClient.Update(ctx, virtualMachine)
+			if err != nil {
+				msg := fmt.Sprintf("adkulkarni->Publish->Failed to update VirtualMachines %q with Error: %+v "+
+					"\n VirtualMachine: %+v", virtualMachine.Name, err, virtualMachine)
+				log.Error(msg)
+				// todo: aditya: not returning here just to see logs. ideally we return here
+			}
 			virtualMachineLock.Unlock()
 			if err == nil || time.Now().After(timeout) {
 				break
 			}
-			if err := c.vmOperatorClient.Get(ctx, vmKey, virtualMachine); err != nil {
-				msg := fmt.Sprintf("failed to get VirtualMachines for the node: %q. Error: %+v", req.NodeId, err)
+			// todo: fetching from cluster. use a deepcopy for virtualMachine? is this getting merged?
+			if err = c.vmOperatorClient.Get(ctx, vmKey, virtualMachine); err != nil {
+				msg := fmt.Sprintf("adkulkarni->failed to get VirtualMachines for the node: %q. Error: %+v", req.NodeId, err)
 				log.Error(msg)
 				return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 			}
-			log.Debugf("Found virtualMachine instance for node: %q", req.NodeId)
+			log.Infof("adkulkarni->Found virtualMachine instance %+v for node: %q", virtualMachine, req.NodeId)
 		}
 		if err != nil {
-			msg := fmt.Sprintf("Time out to update VirtualMachines %q with Error: %+v", virtualMachine.Name, err)
+			msg := fmt.Sprintf("adkulkarni->Time out to update VirtualMachines %q with Error: %+v", virtualMachine.Name, err)
 			log.Error(msg)
 			return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 		}
@@ -594,7 +604,7 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 			TimeoutSeconds:  &timeoutSeconds,
 		})
 		if err != nil {
-			msg := fmt.Sprintf("failed to watch virtualMachine %q with Error: %v", virtualMachine.Name, err)
+			msg := fmt.Sprintf("adkulkarni->failed to watch virtualMachine %q with Error: %v", virtualMachine.Name, err)
 			log.Error(msg)
 			return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 		}
@@ -603,30 +613,30 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 		// Watch all update events made on VirtualMachine instance until volume.DiskUuid is set
 		for diskUUID == "" {
 			// blocking wait for update event
-			log.Debugf("waiting for update on virtualmachine: %q", virtualMachine.Name)
+			log.Infof("adkulkarni->waiting for update on virtualmachine: %q", virtualMachine.Name)
 			event := <-watchVirtualMachine.ResultChan()
 			vm, ok := event.Object.(*vmoperatortypes.VirtualMachine)
 			if !ok {
-				msg := fmt.Sprintf("Watch on virtualmachine %q timed out", virtualMachine.Name)
+				msg := fmt.Sprintf("adkulkarni->Watch on virtualmachine %q timed out", virtualMachine.Name)
 				log.Error(msg)
 				return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 			}
 			if vm.Name != virtualMachine.Name {
-				log.Debugf("Observed vm name: %q, expecting vm name: %q, volumeID: %q",
+				log.Infof("adkulkarni->Observed vm name: %q, expecting vm name: %q, volumeID: %q",
 					vm.Name, virtualMachine.Name, req.VolumeId)
 				continue
 			}
-			log.Debugf("observed update on virtualmachine: %q. checking if disk UUID is set for volume: %q ",
+			log.Infof("adkulkarni->observed update on virtualmachine: %q. checking if disk UUID is set for volume: %q ",
 				virtualMachine.Name, req.VolumeId)
 			for _, volume := range vm.Status.Volumes {
 				if volume.Name == req.VolumeId {
 					if volume.Attached && volume.DiskUuid != "" && volume.Error == "" {
 						diskUUID = volume.DiskUuid
-						log.Infof("observed disk UUID %q is set for the volume %q on virtualmachine %q",
+						log.Infof("adkulkarni->observed disk UUID %q is set for the volume %q on virtualmachine %q",
 							volume.DiskUuid, volume.Name, vm.Name)
 					} else {
 						if volume.Error != "" {
-							msg := fmt.Sprintf("observed Error: %q is set on the volume %q on virtualmachine %q",
+							msg := fmt.Sprintf("adkulkarni->observed Error: %q is set on the volume %q on virtualmachine %q",
 								volume.Error, volume.Name, vm.Name)
 							log.Error(msg)
 							return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
@@ -636,13 +646,13 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 				}
 			}
 			if diskUUID == "" {
-				log.Debugf("disk UUID is not set for volume: %q ", req.VolumeId)
+				log.Infof("adkulkarni->disk UUID is not set for volume: %q ", req.VolumeId)
 			}
 		}
-		log.Debugf("disk UUID %v is set for the volume: %q ", diskUUID, req.VolumeId)
+		log.Infof("adkulkarni->disk UUID %v is set for the volume: %q ", diskUUID, req.VolumeId)
 	}
 
-	//return PublishContext with diskUUID of the volume attached to node.
+	// return PublishContext with diskUUID of the volume attached to node.
 	publishInfo := make(map[string]string)
 	publishInfo[common.AttributeDiskType] = common.DiskTypeBlockVolume
 	publishInfo[common.AttributeFirstClassDiskUUID] = common.FormatDiskUUID(diskUUID)
@@ -806,7 +816,7 @@ func (c *controller) ControllerUnpublishVolume(ctx context.Context, req *csi.Con
 	controllerUnpublishVolumeInternal := func() (
 		*csi.ControllerUnpublishVolumeResponse, string, error) {
 		log.Infof("ControllerUnpublishVolume: called with args %+v", *req)
-		//TODO: If the err is returned by invoking CNS API, then faultType should be
+		// TODO: If the err is returned by invoking CNS API, then faultType should be
 		// populated by the underlying layer.
 		// If the request failed due to validate the request, "csi.fault.InvalidArgument" will be return.
 		// If thr reqeust failed due to object not found, "csi.fault.NotFound" will be return.
@@ -882,17 +892,24 @@ func controllerUnpublishForBlockVolume(ctx context.Context, req *csi.ControllerU
 		log.Error(msg)
 		return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 	}
-	log.Debugf("Found VirtualMachine for node: %q.", req.NodeId)
+	log.Infof("Found VirtualMachine for node: %q.", req.NodeId)
 	timeoutSeconds := int64(getAttacherTimeoutInMin(ctx) * 60)
 	timeout := time.Now().Add(time.Duration(timeoutSeconds) * time.Second)
 	for {
 		for index, volume := range virtualMachine.Spec.Volumes {
 			if volume.Name == req.VolumeId {
-				log.Debugf("Removing volume %q from VirtualMachine %q", volume.Name, virtualMachine.Name)
+				log.Infof("Removing volume %q from VirtualMachine %q", volume.Name, virtualMachine.Name)
 				virtualMachineLock.Lock()
 				virtualMachine.Spec.Volumes = append(virtualMachine.Spec.Volumes[:index],
 					virtualMachine.Spec.Volumes[index+1:]...)
 				err = c.vmOperatorClient.Update(ctx, virtualMachine)
+				// todo: adkulkarni: why is the error not handled over here?
+				if err != nil {
+					msg := fmt.Sprintf("adkulkarni->Unpublish->Failed to update VirtualMachines %q with Error: %+v "+
+						"\n VirtualMachine: %+v", virtualMachine.Name, err, virtualMachine)
+					log.Error(msg)
+					// todo: aditya: not returning here just to see logs. ideally we return here
+				}
 				virtualMachineLock.Unlock()
 				break
 			}
@@ -959,7 +976,7 @@ func controllerUnpublishForBlockVolume(ctx context.Context, req *csi.ControllerU
 			isVolumeDetached = true
 			for _, volume := range vm.Status.Volumes {
 				if volume.Name == req.VolumeId {
-					log.Debugf("Volume %q still exists in VirtualMachine %q status", volume.Name, virtualMachine.Name)
+					log.Infof("Volume %q still exists in VirtualMachine %q status", volume.Name, virtualMachine.Name)
 					isVolumeDetached = false
 					if volume.Attached && volume.Error != "" {
 						msg := fmt.Sprintf("failed to detach volume %q from VirtualMachine %q with Error: %v",
@@ -1094,7 +1111,7 @@ func (c *controller) ControllerExpandVolume(ctx context.Context, req *csi.Contro
 			return nil, csifault.CSIUnimplementedFault, status.Error(codes.Unimplemented, msg)
 		}
 		log.Infof("ControllerExpandVolume: called with args %+v", *req)
-		//TODO: If the err is returned by invoking CNS API, then faultType should be
+		// TODO: If the err is returned by invoking CNS API, then faultType should be
 		// populated by the underlying layer.
 		// If the request failed due to validate the request, "csi.fault.InvalidArgument" will be return.
 		// If thr reqeust failed due to object not found, "csi.fault.NotFound" will be return.
