@@ -570,9 +570,10 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 			}
 			virtualMachineLock.Lock()
 			virtualMachine.Spec.Volumes = append(virtualMachine.Spec.Volumes, vmvolumes)
+			log.Infof("adkulkarni->volume count before updating spec: %d", len(virtualMachine.Spec.Volumes))
 			err = c.vmOperatorClient.Update(ctx, virtualMachine)
 			if err != nil {
-				msg := fmt.Sprintf("adkulkarni->Publish->Failed to update VirtualMachines %q with Error: %+v "+
+				msg := fmt.Sprintf("adkulkarni->Publish->Failed to update VirtualMachine %q with Error: %+v "+
 					"\n VirtualMachine: %+v", virtualMachine.Name, err, virtualMachine)
 				log.Error(msg)
 				// todo: aditya: not returning here just to see logs. ideally we return here
@@ -581,12 +582,14 @@ func controllerPublishForBlockVolume(ctx context.Context, req *csi.ControllerPub
 			if err == nil || time.Now().After(timeout) {
 				break
 			}
+			virtualMachine = &vmoperatortypes.VirtualMachine{} // aditya: re-init
 			// todo: fetching from cluster. use a deepcopy for virtualMachine? is this getting merged?
 			if err = c.vmOperatorClient.Get(ctx, vmKey, virtualMachine); err != nil {
 				msg := fmt.Sprintf("adkulkarni->failed to get VirtualMachines for the node: %q. Error: %+v", req.NodeId, err)
 				log.Error(msg)
 				return nil, csifault.CSIInternalFault, status.Errorf(codes.Internal, msg)
 			}
+			log.Infof("adkulkarni->volume count after retrieving from cluster: %d", len(virtualMachine.Spec.Volumes))
 			log.Infof("adkulkarni->Found virtualMachine instance %+v for node: %q", virtualMachine, req.NodeId)
 		}
 		if err != nil {
