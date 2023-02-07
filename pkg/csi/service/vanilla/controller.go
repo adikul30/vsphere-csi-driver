@@ -996,6 +996,8 @@ func (c *controller) createBlockVolume(ctx context.Context, req *csi.CreateVolum
 				"failed to calculate accessible topologies for the datastore %q", datastoreURL)
 		}
 
+		log.Debugf("adkulkarni -> datastoreAccessibleTopology: %+v", datastoreAccessibleTopology)
+
 		// Add topology segments to the CreateVolumeResponse.
 		for _, topoSegments := range datastoreAccessibleTopology {
 			volumeTopology := &csi.Topology{
@@ -1062,6 +1064,7 @@ func (c *controller) getAccessibleTopologiesForDatastore(ctx context.Context, vc
 			"failed to find accessible topologies for the remaining nodes %v. Error: %+v",
 			accessibleNodeNames, err)
 	}
+	log.Debugf("adkulkarni -> datastoreAccessibleTopology: %+v", datastoreAccessibleTopology)
 	return datastoreAccessibleTopology, nil
 }
 
