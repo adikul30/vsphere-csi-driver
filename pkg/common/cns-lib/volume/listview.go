@@ -387,6 +387,13 @@ func (l *ListViewImpl) MarkTaskForDeletion(ctx context.Context, taskMoRef types.
 	return nil
 }
 
+func (l *ListViewImpl) KillListViewInstanceForUnitTest(ctx context.Context)  {
+	log := logger.GetLogger(ctx)
+	l.shouldStopListening = true
+	l.waitForUpdatesCancelFunc()
+	log.Infof("ended listview instance for unit test run")
+}
+
 // // LogoutSession is a setter method to logout vcenter session created
 // func (l *ListViewImpl) LogoutSession(ctx context.Context) error {
 // 	log := logger.GetLogger(ctx)

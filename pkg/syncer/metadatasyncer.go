@@ -298,8 +298,7 @@ func InitMetadataSyncer(ctx context.Context, clusterFlavor cnstypes.CnsClusterFl
 		volumeInfoCrDeletionMap[metadataSyncer.host] = make(map[string]bool)
 		volumeOperationsLock[metadataSyncer.host] = &sync.Mutex{}
 
-		volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false,
-			false, false, metadataSyncer.clusterFlavor)
+		volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false, false, false, metadataSyncer.clusterFlavor)
 		if err != nil {
 			return logger.LogNewErrorf(log, "failed to create an instance of volume manager. err=%v", err)
 		}
@@ -380,8 +379,7 @@ func InitMetadataSyncer(ctx context.Context, clusterFlavor cnstypes.CnsClusterFl
 			volumeInfoCrDeletionMap[metadataSyncer.host] = make(map[string]bool)
 			volumeOperationsLock[metadataSyncer.host] = &sync.Mutex{}
 
-			volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false,
-				false, false, metadataSyncer.clusterFlavor)
+			volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false, false, false, metadataSyncer.clusterFlavor)
 			if err != nil {
 				return logger.LogNewErrorf(log, "failed to create an instance of volume manager. err=%v", err)
 			}
@@ -403,8 +401,7 @@ func InitMetadataSyncer(ctx context.Context, clusterFlavor cnstypes.CnsClusterFl
 					return logger.LogNewErrorf(log, "failed to get vCenterInstance for vCenter Host: %q, err: %v",
 						vcconfig.Host, err)
 				}
-				volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false,
-					true, multivCenterTopologyDeployment, metadataSyncer.clusterFlavor)
+				volumeManager, err := volumes.GetManager(ctx, vCenter, nil, false, true, multivCenterTopologyDeployment, metadataSyncer.clusterFlavor)
 				if err != nil {
 					return logger.LogNewErrorf(log, "failed to create an instance of volume manager. err=%v", err)
 				}
@@ -1448,7 +1445,7 @@ func ReloadConfiguration(metadataSyncer *metadataSyncInformer, reconnectToVCFrom
 						return logger.LogNewErrorf(log, "failed to get VirtualCenter. err=%v", err)
 					}
 					vcenter.Config = newVCConfig
-					err := metadataSyncer.volumeManagers[newVCConfig.Host].ResetManager(ctx, vcenter)
+					err := metadataSyncer.volumeManagers[newVCConfig.Host].ResetManager(ctx, vcenter, false)
 					if err != nil {
 						return logger.LogNewErrorf(log, "failed to reset updated VC object in volumemanager for vCenter: %q "+
 							"err=%v", newVCConfig.Host, err)
@@ -1483,7 +1480,7 @@ func ReloadConfiguration(metadataSyncer *metadataSyncInformer, reconnectToVCFrom
 					return logger.LogNewErrorf(log, "failed to get VirtualCenter. err=%v", err)
 				}
 				vcenter.Config = newVCConfig
-				err := metadataSyncer.volumeManager.ResetManager(ctx, vcenter)
+				err := metadataSyncer.volumeManager.ResetManager(ctx, vcenter, false)
 				if err != nil {
 					return logger.LogNewErrorf(log, "failed to reset volume manager. err=%v", err)
 				}
@@ -1533,12 +1530,11 @@ func ReloadConfiguration(metadataSyncer *metadataSyncInformer, reconnectToVCFrom
 				}
 				vcenter.Config = newVCConfig
 			}
-			err := metadataSyncer.volumeManager.ResetManager(ctx, vcenter)
+			err := metadataSyncer.volumeManager.ResetManager(ctx, vcenter, false)
 			if err != nil {
 				return logger.LogNewErrorf(log, "failed to reset volume manager. err=%v", err)
 			}
-			volumeManager, err := volumes.GetManager(ctx, vcenter, nil, false,
-				false, false, metadataSyncer.clusterFlavor)
+			volumeManager, err := volumes.GetManager(ctx, vcenter, nil, false, false, false, metadataSyncer.clusterFlavor)
 			if err != nil {
 				return logger.LogNewErrorf(log, "failed to create an instance of volume manager. err=%v", err)
 			}

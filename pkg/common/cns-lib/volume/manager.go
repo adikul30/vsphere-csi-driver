@@ -124,7 +124,7 @@ type Manager interface {
 	// should not be nil.
 	ExpandVolume(ctx context.Context, volumeID string, size int64, extraParams interface{}) (string, error)
 	// ResetManager helps set new manager instance and VC configuration.
-	ResetManager(ctx context.Context, vcenter *cnsvsphere.VirtualCenter) error
+	ResetManager(ctx context.Context, vcenter *cnsvsphere.VirtualCenter, isUnitTestRun bool) error
 	// ConfigureVolumeACLs configures net permissions for a given CnsVolumeACLConfigureSpec.
 	ConfigureVolumeACLs(ctx context.Context, spec cnstypes.CnsVolumeACLConfigureSpec) error
 	// RegisterDisk registers virtual disks as FCDs using Vslm endpoint.
@@ -150,6 +150,8 @@ type Manager interface {
 	GetOperationStore() cnsvolumeoperationrequest.VolumeOperationRequest
 	// // LogoutListViewVCSession logout current vCenter session for list-view
 	// LogoutListViewVCSession(ctx context.Context) error
+
+	EndListViewInstanceForUnitTest(ctx context.Context)
 }
 
 // CnsVolumeInfo hold information related to volume created by CNS.
@@ -226,10 +228,7 @@ type createVolumeTaskDetails struct {
 }
 
 // GetManager returns the Manager instance.
-func GetManager(ctx context.Context, vc *cnsvsphere.VirtualCenter,
-	operationStore cnsvolumeoperationrequest.VolumeOperationRequest,
-	idempotencyHandlingEnabled, multivCenterEnabled, multivCenterTopologyDeployment bool,
-	clusterFlavor cnstypes.CnsClusterFlavor) (Manager, error) {
+func GetManager(ctx context.Context, vc *cnsvsphere.VirtualCenter, operationStore cnsvolumeoperationrequest.VolumeOperationRequest, idempotencyHandlingEnabled, multivCenterEnabled, multivCenterTopologyDeployment bool, clusterFlavor cnstypes.CnsClusterFlavor) (Manager, error) {
 	log := logger.GetLogger(ctx)
 	managerInstanceLock.Lock()
 	defer managerInstanceLock.Unlock()
@@ -345,7 +344,7 @@ func ClearInvalidTasksFromListView(multivCenterCSITopologyEnabled bool) {
 }
 
 // ResetManager helps set manager instance with new VC configuration.
-func (m *defaultManager) ResetManager(ctx context.Context, vcenter *cnsvsphere.VirtualCenter) error {
+func (m *defaultManager) ResetManager(ctx context.Context, vcenter *cnsvsphere.VirtualCenter, isUnitTestRun bool) error {
 	log := logger.GetLogger(ctx)
 	managerInstanceLock.Lock()
 	defer managerInstanceLock.Unlock()
@@ -356,6 +355,13 @@ func (m *defaultManager) ResetManager(ctx context.Context, vcenter *cnsvsphere.V
 		// m.virtualCenter.Client.Timeout = time.Duration(vcenter.Config.VCClientTimeout) * time.Minute
 		m.virtualCenter.Client.Timeout = 0 * time.Minute
 		log.Infof("VC client timeout is set to %v", m.virtualCenter.Client.Timeout)
+	}
+	if isUnitTestRun {
+		managerInstance.EndListViewInstanceForUnitTest(ctx)
+		err := managerInstance.initListView(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	log.Infof("Done resetting volume.defaultManager")
 	return nil
@@ -2883,4 +2889,11 @@ func GetAllManagerInstances(ctx context.Context) map[string]*defaultManager {
 		newManagerInstanceMap[managerInstance.virtualCenter.Config.Host] = managerInstance
 	}
 	return newManagerInstanceMap
+}
+
+func (m *defaultManager) EndListViewInstanceForUnitTest(ctx context.Context) {
+	if m.listViewIf == nil {
+		return
+	}
+	m.listViewIf.KillListViewInstanceForUnitTest(ctx)
 }
