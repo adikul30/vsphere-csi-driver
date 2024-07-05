@@ -366,7 +366,7 @@ func getControllerTestWithTopology(t *testing.T) *controllerTestTopology {
 		// GetManager returns a singleton instance of VolumeManager. So, it could be pointing
 		// to old VC instance as part of previous unit test run from same folder.
 		// Call ResetManager to get new VolumeManager instance with current VC configuration.
-		err = volumeManager.ResetManager(ctxtopology, vcenter, false)
+		err = volumeManager.ResetManager(ctxtopology, vcenter, true)
 		if err != nil {
 			t.Fatalf("failed to reset volume manager with new vcenter. err=%v", err)
 		}
